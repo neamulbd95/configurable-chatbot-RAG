@@ -1,0 +1,37 @@
+# Copy this file to config/tables.yaml and adjust for your source database.
+# One entry per table to ingest (FR-1.2). Add more entries to extend to
+# multiple tables — no code changes required.
+
+tables:
+  - name: products
+    primary_key: id
+    exclude_columns:
+      - internal_notes
+    watermark_column: updated_at
+    batch_size: 500
+
+    # --- Phase 2 (optional) ---
+
+    # Restrict this table's chunks to callers whose ChatRequest.roles
+    # overlaps these tags (FR-6.9-6.10). Omit or leave empty for public data.
+    # access_tags:
+    #   - sales
+    #   - support
+
+    # Render normalized text from a fixed template instead of the default
+    # "field: value" line-per-column format (FR-6.4). Placeholders must
+    # match column names (and joined relation table names, see below).
+    # normalization_template: >
+    #   Product {name} costs {price} and is {in_stock}.
+    #   Related orders: {orders}
+
+    # Fold in related child-table rows during extraction (FR-6.2). Each
+    # parent row gets a `columns[relation.table]` list of matching child
+    # rows, usable in normalization_template or the default renderer.
+    # relations:
+    #   - table: orders
+    #     local_key: id
+    #     foreign_key: product_id
+    #     max_related_rows: 20
+    #     exclude_columns:
+    #       - internal_notes

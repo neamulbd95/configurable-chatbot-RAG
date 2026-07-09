@@ -1,0 +1,12 @@
+# Copy to config/eval_set.yaml and fill in with real queries + the
+# record_id(s) (source_table:primary_key) each query should retrieve from
+# your own ingested data. Used by scripts/eval_retrieval.py.
+
+cases:
+  - query: "What is the price of the Widget?"
+    expected_record_ids:
+      - "products:1"
+  - query: "Which products are out of stock?"
+    expected_record_ids:
+      - "products:2"
+      - "products:5"

@@ -1,0 +1,87 @@
+# Local development infrastructure. The source RDBMS and the vector store
+# are separate services on purpose (FR-1.7) — nothing in the app assumes
+# they're the same database. `mysql-source` is an alternate source engine,
+# only needed to exercise the RDBMS-portability test matrix (NFR-1.7); point
+# SOURCE_DB_* at whichever source you want to ingest from.
+
+services:
+  postgres-source:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_source_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mysql-source:
+    image: mysql:8.4
+    profiles: ["cross-engine"]
+    environment:
+      MYSQL_ROOT_PASSWORD: mysql
+      MYSQL_DATABASE: app
+      MYSQL_USER: app
+      MYSQL_PASSWORD: app
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_source_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  vector-store:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: vectorstore
+    ports:
+      - "5433:5432"
+    volumes:
+      - vector_store_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+  app:
+    build: .
+    env_file:
+      - .env
+    environment:
+      SOURCE_DB_HOST: postgres-source
+      VECTOR_DB_HOST: vector-store
+      OLLAMA_BASE_URL: http://ollama:11434
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres-source:
+        condition: service_healthy
+      vector-store:
+        condition: service_healthy
+    volumes:
+      - ./config:/app/config:ro
+
+volumes:
+  postgres_source_data:
+  mysql_source_data:
+  vector_store_data:
+  ollama_data:
