@@ -3,10 +3,14 @@
 # they're the same database. `mysql-source` is an alternate source engine,
 # only needed to exercise the RDBMS-portability test matrix (NFR-1.7); point
 # SOURCE_DB_* at whichever source you want to ingest from.
+#
+# `postgres-source` builds from ./dbFile — a seeded fixture DB (see
+# dbFile/init.sql), not a production dependency. Point SOURCE_DB_* at your
+# real database and drop this service entirely for anything beyond local dev.
 
 services:
   postgres-source:
-    image: postgres:16
+    build: ./dbFile
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres

@@ -20,19 +20,42 @@ class RelationConfig(BaseModel):
     table: str
     local_key: str
     foreign_key: str
+    # Postgres/SQL Server/Oracle schema the related table lives in, if not
+    # the connection's default (e.g. "public"). MySQL treats this as a
+    # database name — same SQLAlchemy `schema=` kwarg either way.
+    schema_name: str | None = Field(default=None, alias="schema")
     max_related_rows: int = 20
     exclude_columns: list[str] = Field(default_factory=list)
+
+    model_config = {"populate_by_name": True}
 
 
 class TableConfig(BaseModel):
     name: str
     primary_key: str
+    # Schema the table lives in, if not the connection's default. Kept
+    # separate from `name` (rather than asking users to write "schema.table")
+    # because reflection needs schema and table name as distinct arguments.
+    schema_name: str | None = Field(default=None, alias="schema")
     exclude_columns: list[str] = Field(default_factory=list)
     watermark_column: str | None = None
     batch_size: int = 500
     relations: list[RelationConfig] = Field(default_factory=list)
     normalization_template: str | None = None
     access_tags: list[str] = Field(default_factory=list)
+
+    model_config = {"populate_by_name": True}
+
+    @property
+    def qualified_name(self) -> str:
+        """Schema-qualified identity used everywhere a table needs a unique
+        string identity: record_id, chunk citations, watermark keys, admin
+        API table filters. Without this, two same-named tables in different
+        schemas (e.g. sales.products and archive.products) would collide —
+        their chunks would overwrite each other in the vector store, since
+        chunk_id derives from record_id which derived from the bare table
+        name alone."""
+        return f"{self.schema_name}.{self.name}" if self.schema_name else self.name
 
     @field_validator("normalization_template")
     @classmethod

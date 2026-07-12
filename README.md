@@ -50,20 +50,43 @@ Both the source database engine and the LLM/embedding provider are swappable via
 - [Ollama](https://ollama.com) (for local development) with the `qwen3:8b` and `nomic-embed-text` models pulled — or an Azure OpenAI resource for cloud deployment
 - Docker Desktop (recommended, for the source DB, vector store, and Ollama containers) — or your own PostgreSQL/MySQL/etc. instances
 
+#### Windows notes
+
+These affect every command below that involves `curl` or a JSON body — read this once, then the rest of the guide makes sense on Windows.
+
+- **`python` vs `python3`.** Use `python`. On a stock Windows install, `python3` (and sometimes bare `python`) can resolve to a Microsoft Store stub that does nothing but print an install prompt. If that happens, use the `py` launcher instead: `py -3.11`.
+- **PowerShell's `curl` is not curl.** PowerShell ships `curl` as a built-in alias for `Invoke-WebRequest`, which does not understand `-X`, `-H`, or `-d` the way real curl does — running the plain `curl` commands below in PowerShell fails with an error like `Cannot bind parameter 'Headers'...`. Windows 10 (1803+) and Windows 11 also ship the real curl at `C:\Windows\System32\curl.exe`, so every command below that needs to work in PowerShell uses `curl.exe` explicitly to bypass the alias.
+- **JSON body quoting differs by shell.** A `-d '{"key": "value"}'` body with unescaped inner double-quotes works correctly in bash/Git Bash, but gets mangled by PowerShell's argument passing to native executables (the JSON silently arrives as `{}`, no obvious error). Wherever a command sends a JSON body containing embedded quotes, a separate PowerShell-safe version (escaped as `-d '{\"key\": \"value\"}'`) is given.
+- **`cp`.** Works in PowerShell (built-in alias for `Copy-Item`) but not in Command Prompt — use `copy` there, or just use PowerShell/Git Bash instead of `cmd.exe`.
+
 ### 1. Clone and set up a virtual environment
 
 ```bash
 git clone <this-repo>
 cd ChatBot
 python -m venv .venv
-# Windows: .venv\Scripts\activate     macOS/Linux: source .venv/bin/activate
+```
+
+Activate it:
+
+| Shell | Command |
+|---|---|
+| PowerShell | `.venv\Scripts\Activate.ps1` |
+| Command Prompt | `.venv\Scripts\activate.bat` |
+| macOS/Linux/Git Bash | `source .venv/bin/activate` |
+
+If PowerShell refuses with `running scripts is disabled on this system`, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once and try again.
+
+Then install:
+
+```bash
 pip install -e ".[dev]"
 ```
 
 Optional extras:
 ```bash
 pip install -e ".[mysql]"    # MySQL source DB driver
-pip install -e ".[mssql]"    # SQL Server source DB driver
+pip install -e ".[mssql]"    # SQL Server source DB driver — also needs the "ODBC Driver 18 for SQL Server" installed at the OS level (a separate Microsoft installer, not a pip package)
 pip install -e ".[oracle]"   # Oracle source DB driver
 pip install -e ".[rerank]"   # cross-encoder reranking model support
 ```
@@ -75,15 +98,17 @@ cp .env.example .env
 cp config/tables.example.yaml config/tables.yaml
 ```
 
-Edit `.env` for your source database engine/credentials, vector store credentials, and provider choice (`ollama` or `azure_openai`). Edit `config/tables.yaml` to list the table(s) you want to ingest, their primary key, any columns to exclude, and (optionally) relations, an access-tag list, or a normalization template — see the commented examples in `config/tables.example.yaml`.
+Edit `.env` for your source database engine/credentials, vector store credentials, and provider choice (`ollama` or `azure_openai`). Edit `config/tables.yaml` to list the table(s) you want to ingest, their primary key, any columns to exclude, and (optionally) a non-default Postgres/SQL Server/Oracle schema, relations, an access-tag list, or a normalization template — see the commented examples in `config/tables.example.yaml`. Tables outside the connection's default schema need `schema: <name>` set per table (and per relation, if the joined table lives elsewhere too) — once set, that table is identified everywhere as `schema.table` (e.g. in `/admin/ingest`'s `tables` filter), so same-named tables in different schemas never collide.
 
 ### 3. Start infrastructure
 
 ```bash
 docker compose up -d postgres-source vector-store ollama
-docker exec -it <ollama-container> ollama pull qwen3:8b
-docker exec -it <ollama-container> ollama pull nomic-embed-text
+docker compose exec ollama ollama pull qwen3:8b
+docker compose exec ollama ollama pull nomic-embed-text
 ```
+
+(`docker compose exec` addresses the container by its service name from `docker-compose.yml`, so there's no container-name placeholder to substitute — same command on every platform.)
 
 (Skip `postgres-source` if you're pointing `SOURCE_DB_*` at your own existing database. Add `--profile cross-engine` to also start the `mysql-source` service.)
 
@@ -102,17 +127,23 @@ Set `ADMIN_API_KEY` in `.env` before exposing this service anywhere but your own
 
 ### 5. Run ingestion
 
+Replace `YOUR_ADMIN_API_KEY` below with your actual key from `.env` (or drop the `-H "X-Admin-Api-Key: ..."` argument entirely if you left `ADMIN_API_KEY` unset for local dev).
+
 **Recommended: trigger it over the API**, so it's trackable and doesn't need shell access to wherever the service runs:
 
 ```bash
-curl -X POST http://localhost:8000/admin/ingest \
-  -H "X-Admin-Api-Key: $ADMIN_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{}'
+curl -X POST http://localhost:8000/admin/ingest -H "X-Admin-Api-Key: YOUR_ADMIN_API_KEY" -H "Content-Type: application/json" -d '{}'
 # -> {"job_id": "...", "status": "pending"}
 
-curl http://localhost:8000/admin/ingest/<job_id> -H "X-Admin-Api-Key: $ADMIN_API_KEY"
+curl http://localhost:8000/admin/ingest/<job_id> -H "X-Admin-Api-Key: YOUR_ADMIN_API_KEY"
 # -> {"status": "running" | "succeeded" | "failed", "stats": {...}, "error": null, ...}
+```
+
+PowerShell — same two calls (uses `curl.exe`; see Windows notes above):
+
+```powershell
+curl.exe -X POST http://localhost:8000/admin/ingest -H "X-Admin-Api-Key: YOUR_ADMIN_API_KEY" -H "Content-Type: application/json" -d '{}'
+curl.exe http://localhost:8000/admin/ingest/<job_id> -H "X-Admin-Api-Key: YOUR_ADMIN_API_KEY"
 ```
 
 Omit `"tables"` in the body to ingest everything in `config/tables.yaml`, or pass `{"tables": ["products"]}` to ingest a subset. The run happens in the background — the POST returns immediately with a `job_id`, and you poll the GET endpoint for progress/result. Each table resumes from its own persisted watermark on subsequent runs.
@@ -120,10 +151,13 @@ Omit `"tables"` in the body to ingest everything in `config/tables.yaml`, or pas
 To wipe ingested data (e.g. before a clean re-ingest), reset the vector store — this is destructive and requires an explicit confirmation flag:
 
 ```bash
-curl -X POST http://localhost:8000/admin/vector-store/reset \
-  -H "X-Admin-Api-Key: $ADMIN_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"tables": ["products"], "confirm": true}'
+curl -X POST http://localhost:8000/admin/vector-store/reset -H "X-Admin-Api-Key: YOUR_ADMIN_API_KEY" -H "Content-Type: application/json" -d '{"tables": ["products"], "confirm": true}'
+```
+
+PowerShell (the embedded double-quotes need escaping differently — see Windows notes above):
+
+```powershell
+curl.exe -X POST http://localhost:8000/admin/vector-store/reset -H "X-Admin-Api-Key: YOUR_ADMIN_API_KEY" -H "Content-Type: application/json" -d '{\"tables\": [\"products\"], \"confirm\": true}'
 ```
 
 Omit `"tables"` (or pass an empty list) to reset everything. Resetting a table also clears its persisted watermark, so the next ingestion run does a full re-scan instead of silently skipping rows that no longer exist in the vector store.
@@ -160,4 +194,4 @@ python scripts/eval_retrieval.py config/eval_set.yaml
 
 ---
 
-**Current implementation status:** Phase 1 and Phase 2 application logic is fully implemented and covered by unit tests, but has not yet been exercised against live infrastructure (no Docker Desktop / live LLM in the build environment). See the status legend and per-item markers in [TASK-BREAKDOWN.md](./TASK-BREAKDOWN.md) for exactly what still needs live validation before a production sign-off.
+**Current implementation status:** Phase 1 and Phase 2 application logic is implemented, covered by unit tests, and has been exercised end to end against live infrastructure (real PostgreSQL source + pgvector vector store + Ollama) — ingestion (including relation joins), grounded `/chat` with citations, multi-turn session persistence, and the admin ingest/reset APIs (auth, confirm-guard, actual deletion) all verified working. Not yet live-validated: the MySQL/SQL Server/Oracle source-engine paths (only PostgreSQL has been exercised live), the optional cross-encoder reranker (`pip install .[rerank]`), Azure OpenAI as a live provider, and load/latency testing against the NFR targets. See [TASK-BREAKDOWN.md](./TASK-BREAKDOWN.md) for the full status legend and per-item markers.

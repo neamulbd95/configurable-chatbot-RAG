@@ -64,7 +64,7 @@ async def _ingest_table(
     pending: list[ChunkRecord] = []
     max_watermark: datetime | None = None
 
-    watermark_since = _parse_watermark(get_watermark(vector_engine, table_config.name))
+    watermark_since = _parse_watermark(get_watermark(vector_engine, table_config.qualified_name))
 
     for source_record in extract_table(source_engine, table_config, watermark_since=watermark_since):
         if table_config.watermark_column and source_record.updated_at is not None:
@@ -92,7 +92,7 @@ async def _ingest_table(
         chunk_count += len(pending)
 
     if max_watermark is not None:
-        set_watermark(vector_engine, table_config.name, max_watermark.isoformat())
+        set_watermark(vector_engine, table_config.qualified_name, max_watermark.isoformat())
 
     return chunk_count, vector_table
 
@@ -126,8 +126,8 @@ async def run_ingestion_for_tables(
             chunk_overlap,
             vector_table,
         )
-        stats[table_config.name] = chunk_count
-        logger.info("Ingested %s chunks from table %s", chunk_count, table_config.name)
+        stats[table_config.qualified_name] = chunk_count
+        logger.info("Ingested %s chunks from table %s", chunk_count, table_config.qualified_name)
 
     return stats
 

@@ -37,11 +37,10 @@ tables:
     # Fold in related child-table rows during extraction (FR-6.2). Each
     # parent row gets a `columns[relation.table]` list of matching child
     # rows, usable in normalization_template or the default renderer.
-    # relations:
-    #   - table: orders
-    #     schema: sales           # optional, same rules as the table-level `schema` above
-    #     local_key: id
-    #     foreign_key: product_id
-    #     max_related_rows: 20
-    #     exclude_columns:
-    #       - internal_notes
+    relations:
+      - table: orders
+        local_key: id
+        foreign_key: product_id
+        max_related_rows: 20
+        exclude_columns:
+          - internal_notes

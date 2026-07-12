@@ -110,16 +110,16 @@ async def start_ingestion(
 
     if payload.tables:
         requested = set(payload.tables)
-        known = {t.name for t in table_configs}
+        known = {t.qualified_name for t in table_configs}
         missing = requested - known
         if missing:
             raise HTTPException(status_code=400, detail=f"Unknown table(s): {sorted(missing)}")
-        table_configs = [t for t in table_configs if t.name in requested]
+        table_configs = [t for t in table_configs if t.qualified_name in requested]
 
     engine = app.state.vector_engine
     ensure_job_schema(engine)
     ensure_watermark_schema(engine)
-    job_id = create_job(engine, [t.name for t in table_configs])
+    job_id = create_job(engine, [t.qualified_name for t in table_configs])
 
     background_tasks.add_task(_run_ingestion_job, app, job_id, table_configs)
     return IngestStartResponse(job_id=job_id, status="pending")

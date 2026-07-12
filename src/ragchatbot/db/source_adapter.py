@@ -18,9 +18,9 @@ def build_engine(db_settings: DatabaseSettings) -> Engine:
     return create_engine(db_settings.sqlalchemy_url(), pool_pre_ping=True, future=True)
 
 
-def reflect_table(engine: Engine, table_name: str) -> Table:
+def reflect_table(engine: Engine, table_name: str, schema: str | None = None) -> Table:
     metadata = MetaData()
-    return Table(table_name, metadata, autoload_with=engine)
+    return Table(table_name, metadata, autoload_with=engine, schema=schema)
 
 
 class SourceTableReader:
@@ -31,9 +31,11 @@ class SourceTableReader:
     O(n) page-seek cost on very large tables (acceptable for the Phase 1
     baseline throughput target, NFR-1.3)."""
 
-    def __init__(self, engine: Engine, table_name: str, batch_size: int = 500):
+    def __init__(
+        self, engine: Engine, table_name: str, batch_size: int = 500, schema: str | None = None
+    ):
         self.engine = engine
-        self.table = reflect_table(engine, table_name)
+        self.table = reflect_table(engine, table_name, schema=schema)
         self.batch_size = batch_size
 
     def iter_rows(

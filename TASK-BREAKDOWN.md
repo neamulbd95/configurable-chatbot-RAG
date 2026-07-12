@@ -91,6 +91,7 @@ Three points vary by deployment and are each hidden behind a config-selected ada
 
 ### Epic 1: Data Extraction & Normalization (FR-1.1–1.7)
 - [x] Table extractor: paginated/batched row fetch from configured table via the dialect-agnostic adapter — **FR-1.1, FR-1.6**
+- [x] Per-table (and per-relation) `schema` config for non-default Postgres/SQL Server/Oracle schemas; tables are identified as `schema.table` everywhere (record IDs, watermarks, admin API filters) so same-named tables in different schemas never collide — **FR-1.1**
 - [x] Column exclusion logic (PK/FK excluded from normalized text but retained as metadata) — **FR-1.2**
 - [x] Null-safe, type-safe normalization function → canonical text field — **FR-1.3**
 - [x] Lineage stamping: `source_table`, `primary_key`, `extracted_at` — **FR-1.4**
@@ -113,7 +114,7 @@ Three points vary by deployment and are each hidden behind a config-selected ada
 - [x] Attach citations (source table + row key) to each result — **FR-3.3**
 - [x] Assemble standardized context package schema for the chat service — **FR-3.4**
 - [ ] Retrieval latency instrumentation (p95 target) — **NFR-1.1**
-- [ ] Live integration tests: top-K correctness, threshold exclusion against a real vector store
+- [x] Live integration test: top-K correctness, threshold exclusion against a real vector store — verified 2026-07-12 against pgvector with real Ollama embeddings
 
 ### Epic 4: Chat Service & API (FR-4.1–4.4)
 - [x] `/chat` endpoint: request/response contract (auto-documented via FastAPI OpenAPI) — **FR-4.1**
@@ -121,7 +122,7 @@ Three points vary by deployment and are each hidden behind a config-selected ada
 - [x] Session ID acceptance + persistence, now also feeding multi-turn context (FR-6.11) — **FR-4.3**
 - [x] Include citations in the answer payload — **FR-4.4**
 - [ ] End-to-end latency instrumentation (p95 target, excluding UI render) — **NFR-1.2**
-- [ ] Live integration test: full ask → retrieve → generate → citation round trip
+- [x] Live integration test: full ask → retrieve → generate → citation round trip — verified 2026-07-12 end-to-end (Ollama qwen3:8b), including multi-turn session persistence
 
 ### Epic 5: Provider Configurability (FR-5.1–5.3)
 - [x] Ollama defaults wired (`qwen3:8b` chat, `nomic-embed-text` embed) — **FR-5.1**
@@ -137,9 +138,9 @@ Three points vary by deployment and are each hidden behind a config-selected ada
 
 ### Epic 7: Testing & QA (Phase 1 exit criteria)
 - [x] Unit test coverage for extraction, normalization, chunking, retrieval, chat service logic
-- [ ] Live integration test: one-table ingest → query → grounded answer with citation
+- [x] Live integration test: one-table ingest → query → grounded answer with citation — verified 2026-07-12 (see Epic 4)
 - [ ] Load/perf check against NFR-1.1–1.3 targets
-- [ ] Live config-driven provider switch smoke test (Ollama ↔ Azure OpenAI)
+- [ ] Live config-driven provider switch smoke test (Ollama ↔ Azure OpenAI) — Ollama side verified live; Azure OpenAI still untested live
 
 ---
 
@@ -184,7 +185,7 @@ Three points vary by deployment and are each hidden behind a config-selected ada
 - [x] `GET /admin/ingest/{job_id}` — poll job status/stats/error, persisted in the vector-store DB (`ingestion_jobs` table) so any worker can serve the read
 - [x] `POST /admin/vector-store/reset` — delete ingested chunks (optionally scoped to tables) and their persisted watermarks together, so a reset can't leave a stale watermark that skips rows on the next run; requires an explicit `confirm: true` to guard against accidental full wipes
 - [x] `ADMIN_API_KEY`-gated (`X-Admin-Api-Key` header) — unauthenticated only when the key is left unset, with a startup warning log in that case
-- [ ] Live validation of all three endpoints against a running Postgres + Ollama stack
+- [x] Live validation of all three endpoints against a running Postgres + Ollama stack — verified 2026-07-12: ingest (with relation join), job status polling, and reset (auth rejection, confirm-guard, actual deletion) all confirmed against real containers
 
 ---
 
@@ -203,4 +204,4 @@ Three points vary by deployment and are each hidden behind a config-selected ada
 - **Phase 1:** All Epic 0, 0b, 1–7 tasks checked, PDR §1.3 Success Criteria met, NFR-1.1–1.8 targets validated in a load test (including cross-engine extraction and containerized deployment), provider swap smoke test passing.
 - **Phase 2:** All Epic 8–13 tasks checked, NFR-2.1–2.4 targets validated, RBAC default-deny test passing, eval set shows reranking improves precision@K over baseline.
 
-**Current state (2026-07-09):** all Phase 1 and Phase 2 application logic is implemented and covered by unit tests (39 tests, pure-logic + `TestClient` smoke test, no live dependencies) — see the `[~]`/`[ ]` markers above for what still needs a real PostgreSQL/MySQL/Ollama/Azure OpenAI environment to validate: cross-engine extraction, live RBAC/hybrid-search SQL execution, end-to-end latency, and the optional cross-encoder reranker (needs `pip install .[rerank]`). Neither phase is "done" by this document's own Definition of Done until that validation happens.
+**Current state (2026-07-12):** all Phase 1 and Phase 2 application logic is implemented, covered by 49 unit tests, and has been exercised live end-to-end against real PostgreSQL + pgvector + Ollama (ingestion including relation joins, grounded `/chat` with citations, multi-turn session persistence, and all three admin API endpoints — see Epics 4, 7, 14 above). Still needing live validation, per the remaining `[~]`/`[ ]` markers above: MySQL/SQL Server/Oracle as a source engine (only PostgreSQL tested live), RBAC enforcement against a live vector store (no `access_tags` configured in the tested run), hybrid-search SQL execution, the optional cross-encoder reranker (`pip install .[rerank]`), Azure OpenAI as a live provider, and load/latency numbers against the NFR targets. Neither phase is "done" by this document's own Definition of Done until that remaining validation happens.

@@ -31,13 +31,21 @@ def extract_table(
     table_config: TableConfig,
     watermark_since: object | None = None,
 ) -> Iterator[SourceRecord]:
-    reader = SourceTableReader(engine, table_config.name, batch_size=table_config.batch_size)
+    reader = SourceTableReader(
+        engine,
+        table_config.name,
+        batch_size=table_config.batch_size,
+        schema=table_config.schema_name,
+    )
 
     # Reflect each related table once per extraction run, not once per row —
     # reflection is a schema round trip and rows can number in the thousands.
-    relation_tables: dict[str, Table] = {}
+    # Keyed by (schema, table) so two relations with the same table name in
+    # different schemas don't collide.
+    relation_tables: dict[tuple[str | None, str], Table] = {}
     for relation in table_config.relations:
-        relation_tables[relation.table] = reflect_table(engine, relation.table)
+        key = (relation.schema_name, relation.table)
+        relation_tables[key] = reflect_table(engine, relation.table, schema=relation.schema_name)
 
     for row in reader.iter_rows(
         watermark_column=table_config.watermark_column,
@@ -53,12 +61,18 @@ def extract_table(
 
         for relation in table_config.relations:
             local_value = row[relation.local_key]
+            related_table = relation_tables[(relation.schema_name, relation.table)]
+            # The dict key stays the bare table name (not schema-qualified)
+            # since it doubles as the normalization_template placeholder
+            # name, and "{schema.table}" isn't valid str.format syntax.
             columns[relation.table] = _fetch_related_rows(
-                engine, relation_tables[relation.table], relation, local_value
+                engine, related_table, relation, local_value
             )
 
         yield SourceRecord(
-            source_table=table_config.name,
+            # Schema-qualified so two same-named tables in different schemas
+            # don't collide on record_id / chunk_id (see TableConfig.qualified_name).
+            source_table=table_config.qualified_name,
             primary_key_value=str(pk_value),
             columns=columns,
             updated_at=updated_at,
