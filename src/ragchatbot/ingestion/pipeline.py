@@ -133,8 +133,8 @@ async def run_ingestion_for_tables(
 
 
 async def run_ingestion(settings: Settings) -> dict[str, int]:
-    table_configs = load_table_configs(settings.tables_config_path)
-    source_engine = build_engine(settings.source_db())
+    table_configs = load_table_configs(settings.tables_config_path, settings.source_db_schema)
+    source_engine = build_engine(settings.source_db(), settings.source_db_connect_timeout_seconds)
     vector_engine = build_vector_engine(settings.vector_db())
     embedding_provider = build_embedding_provider(settings)
 

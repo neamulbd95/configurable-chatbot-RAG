@@ -92,6 +92,8 @@ Three points vary by deployment and are each hidden behind a config-selected ada
 ### Epic 1: Data Extraction & Normalization (FR-1.1–1.7)
 - [x] Table extractor: paginated/batched row fetch from configured table via the dialect-agnostic adapter — **FR-1.1, FR-1.6**
 - [x] Per-table (and per-relation) `schema` config for non-default Postgres/SQL Server/Oracle schemas; tables are identified as `schema.table` everywhere (record IDs, watermarks, admin API filters) so same-named tables in different schemas never collide — **FR-1.1**
+- [x] `SOURCE_DB_SCHEMA` env-level default schema, applied to any table/relation that doesn't set its own `schema:` — since which schema holds the tables is a per-environment fact (differs machine to machine) rather than something to hardcode into the typically-shared/committed `tables.yaml` — **FR-1.1**; found live 2026-07-12 via a real `NoSuchTableError` when a table existed only in a non-default schema with no schema config set
+- [x] Per-engine connect-timeout (`SOURCE_DB_CONNECT_TIMEOUT_SECONDS`, default 10s) on the source DB engine, so an unreachable/filtered host fails fast instead of hanging on the OS's own TCP timeout — **FR-1.1**
 - [x] Column exclusion logic (PK/FK excluded from normalized text but retained as metadata) — **FR-1.2**
 - [x] Null-safe, type-safe normalization function → canonical text field — **FR-1.3**
 - [x] Lineage stamping: `source_table`, `primary_key`, `extracted_at` — **FR-1.4**
@@ -185,7 +187,8 @@ Three points vary by deployment and are each hidden behind a config-selected ada
 - [x] `GET /admin/ingest/{job_id}` — poll job status/stats/error, persisted in the vector-store DB (`ingestion_jobs` table) so any worker can serve the read
 - [x] `POST /admin/vector-store/reset` — delete ingested chunks (optionally scoped to tables) and their persisted watermarks together, so a reset can't leave a stale watermark that skips rows on the next run; requires an explicit `confirm: true` to guard against accidental full wipes
 - [x] `ADMIN_API_KEY`-gated (`X-Admin-Api-Key` header) — unauthenticated only when the key is left unset, with a startup warning log in that case
-- [x] Live validation of all three endpoints against a running Postgres + Ollama stack — verified 2026-07-12: ingest (with relation join), job status polling, and reset (auth rejection, confirm-guard, actual deletion) all confirmed against real containers
+- [x] `GET /admin/source-db/status` — actual source-DB connectivity check (`SELECT 1`, bounded by `SOURCE_DB_CONNECT_TIMEOUT_SECONDS`), distinct from `/health`/`/ready` which only prove the app process is up
+- [x] Live validation of all four endpoints against a running Postgres + Ollama stack — verified 2026-07-12: ingest (with relation join), job status polling, reset (auth rejection, confirm-guard, actual deletion), and source-db status (including a reproduced-then-fixed `NoSuchTableError` via `SOURCE_DB_SCHEMA`) all confirmed against real containers
 
 ---
 

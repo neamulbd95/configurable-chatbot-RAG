@@ -11,12 +11,19 @@ tables:
     batch_size: 500
 
     # If this table isn't in your connection's default schema (e.g.
-    # "public" on Postgres, "dbo" on SQL Server), set it here. Omit for the
-    # default schema. Internally, tables are identified by "schema.name"
-    # once this is set, so two same-named tables in different schemas never
-    # collide — use the qualified form (e.g. "sales.products") when
-    # targeting a specific table via the /admin/ingest or
-    # /admin/vector-store/reset API "tables" filter.
+    # "public" on Postgres, "dbo" on SQL Server), set it here. Omit to fall
+    # back to SOURCE_DB_SCHEMA from .env if set, or the connection's default
+    # schema otherwise. Internally, tables are identified by "schema.name"
+    # once a schema applies (from either source), so two same-named tables
+    # in different schemas never collide — use the qualified form (e.g.
+    # "sales.products") when targeting a specific table via the
+    # /admin/ingest or /admin/vector-store/reset API "tables" filter.
+    #
+    # Prefer SOURCE_DB_SCHEMA in .env over this field when *all* (or most)
+    # of your tables live in one non-default schema and that schema name
+    # differs machine to machine — that's an environment fact, not
+    # something this shared/committed file should hardcode. Use this
+    # per-table field only for the exceptions.
     # schema: sales
 
     # --- Phase 2 (optional) ---

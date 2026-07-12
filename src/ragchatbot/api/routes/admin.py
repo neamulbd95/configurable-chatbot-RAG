@@ -10,6 +10,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel
+from sqlalchemy import text
 
 from ragchatbot.api.dependencies import require_admin_key
 from ragchatbot.config.tables import TableConfig, load_table_configs
@@ -60,6 +61,41 @@ class IngestJobResponse(BaseModel):
     finished_at: datetime | None = None
 
 
+class SourceDBStatusResponse(BaseModel):
+    connected: bool
+    engine: str
+    host: str
+    port: int
+    database: str
+    source_schema: str | None = None
+    error: str | None = None
+
+
+@router.get("/source-db/status", response_model=SourceDBStatusResponse)
+async def source_db_status(request: Request) -> SourceDBStatusResponse:
+    """Actual connectivity check (SELECT 1), not just app liveness — /health
+    and /ready say the API process is up, not that the source RDBMS is
+    reachable. Useful before triggering ingestion, and after moving the
+    service to a machine where the source DB's host/schema differs."""
+    settings = request.app.state.settings
+    try:
+        with request.app.state.source_engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        connected, error = True, None
+    except Exception as exc:  # noqa: BLE001 - report any connectivity failure, not just specific ones
+        connected, error = False, str(exc)
+
+    return SourceDBStatusResponse(
+        connected=connected,
+        engine=settings.source_db_engine,
+        host=settings.source_db_host,
+        port=settings.source_db_port,
+        database=settings.source_db_name,
+        source_schema=settings.source_db_schema,
+        error=error,
+    )
+
+
 @router.post("/vector-store/reset", response_model=ResetResponse)
 async def reset_vector_store(payload: ResetRequest, request: Request) -> ResetResponse:
     if not payload.confirm:
@@ -106,7 +142,9 @@ async def start_ingestion(
     payload: IngestRequest, request: Request, background_tasks: BackgroundTasks
 ) -> IngestStartResponse:
     app = request.app
-    table_configs = load_table_configs(app.state.settings.tables_config_path)
+    table_configs = load_table_configs(
+        app.state.settings.tables_config_path, app.state.settings.source_db_schema
+    )
 
     if payload.tables:
         requested = set(payload.tables)

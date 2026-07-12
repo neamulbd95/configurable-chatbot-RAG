@@ -29,7 +29,9 @@ async def lifespan(app: FastAPI):
     app.state.settings = settings
     # SQLAlchemy engines are lazy — no connection is opened until first use,
     # so app startup does not require live source/vector databases.
-    app.state.source_engine = build_engine(settings.source_db())
+    app.state.source_engine = build_engine(
+        settings.source_db(), settings.source_db_connect_timeout_seconds
+    )
     app.state.vector_engine = build_vector_engine(settings.vector_db())
     app.state.embedding_provider = build_embedding_provider(settings)
     app.state.chat_provider = build_chat_provider(settings)

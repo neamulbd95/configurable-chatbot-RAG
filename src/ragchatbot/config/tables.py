@@ -78,7 +78,14 @@ class TableConfig(BaseModel):
         return value
 
 
-def load_table_configs(path: str | Path) -> list[TableConfig]:
+def load_table_configs(
+    path: str | Path, default_schema: str | None = None
+) -> list[TableConfig]:
+    """`default_schema` (typically Settings.source_db_schema) fills in
+    `schema` for any table/relation that doesn't set its own — this is what
+    lets tables.yaml stay portable across environments where the schema
+    holding your tables differs machine to machine, instead of hardcoding
+    it into a config file that's usually shared/committed."""
     config_path = Path(path)
     if not config_path.exists():
         raise FileNotFoundError(
@@ -91,4 +98,12 @@ def load_table_configs(path: str | Path) -> list[TableConfig]:
     if not tables:
         raise ValueError(f"No tables defined under 'tables:' in {config_path}")
 
-    return [TableConfig.model_validate(entry) for entry in tables]
+    table_configs = [TableConfig.model_validate(entry) for entry in tables]
+    if default_schema:
+        for table in table_configs:
+            if table.schema_name is None:
+                table.schema_name = default_schema
+            for relation in table.relations:
+                if relation.schema_name is None:
+                    relation.schema_name = default_schema
+    return table_configs

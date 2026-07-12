@@ -98,7 +98,9 @@ cp .env.example .env
 cp config/tables.example.yaml config/tables.yaml
 ```
 
-Edit `.env` for your source database engine/credentials, vector store credentials, and provider choice (`ollama` or `azure_openai`). Edit `config/tables.yaml` to list the table(s) you want to ingest, their primary key, any columns to exclude, and (optionally) a non-default Postgres/SQL Server/Oracle schema, relations, an access-tag list, or a normalization template — see the commented examples in `config/tables.example.yaml`. Tables outside the connection's default schema need `schema: <name>` set per table (and per relation, if the joined table lives elsewhere too) — once set, that table is identified everywhere as `schema.table` (e.g. in `/admin/ingest`'s `tables` filter), so same-named tables in different schemas never collide.
+Edit `.env` for your source database engine/credentials, vector store credentials, and provider choice (`ollama` or `azure_openai`). Edit `config/tables.yaml` to list the table(s) you want to ingest, their primary key, any columns to exclude, and (optionally) relations, an access-tag list, or a normalization template — see the commented examples in `config/tables.example.yaml`.
+
+If your tables live in a non-default schema (e.g. Postgres `"esg"` instead of `"public"`, SQL Server `"dbo"`), set `SOURCE_DB_SCHEMA` in `.env` rather than hardcoding it into `tables.yaml` — which schema holds your tables is a per-environment fact (it commonly differs machine to machine), not something that belongs in a config file that's typically shared/committed. Only set `schema:` on an individual table in `tables.yaml` for the exceptions (a table living in a *different* schema than the rest). Whichever way a schema applies, that table is identified everywhere as `schema.table` (e.g. `esg.asset`) — including the `/admin/ingest` and `/admin/vector-store/reset` `tables` filter — so same-named tables in different schemas never collide.
 
 ### 3. Start infrastructure
 
@@ -118,9 +120,10 @@ docker compose exec ollama ollama pull nomic-embed-text
 uvicorn ragchatbot.api.main:app --reload
 ```
 
-- `GET /health`, `GET /ready` — service health
+- `GET /health`, `GET /ready` — service liveness (the process is up — not a database connectivity check)
 - `POST /chat` — `{"message": "...", "session_id": "...", "roles": ["..."]}` → grounded answer with citations, confidence score, and session ID
 - `GET /docs` — interactive OpenAPI documentation
+- `GET /admin/source-db/status` — actual source-DB connectivity check (`SELECT 1`), not just app liveness — see below
 - `POST /admin/ingest`, `GET /admin/ingest/{job_id}`, `POST /admin/vector-store/reset` — see below
 
 Set `ADMIN_API_KEY` in `.env` before exposing this service anywhere but your own machine — without it, `/admin/*` is unauthenticated (a startup log warns you of this every time).
@@ -129,7 +132,16 @@ Set `ADMIN_API_KEY` in `.env` before exposing this service anywhere but your own
 
 Replace `YOUR_ADMIN_API_KEY` below with your actual key from `.env` (or drop the `-H "X-Admin-Api-Key: ..."` argument entirely if you left `ADMIN_API_KEY` unset for local dev).
 
-**Recommended: trigger it over the API**, so it's trackable and doesn't need shell access to wherever the service runs:
+**Optional but recommended first: check the source DB is actually reachable**, especially after moving the service to a new machine or changing `SOURCE_DB_*`/`SOURCE_DB_SCHEMA` — a failed ingestion job is a lot easier to read as a connectivity problem before you've also introduced a table-not-found or a schema mismatch into the mix:
+
+```bash
+curl http://localhost:8000/admin/source-db/status -H "X-Admin-Api-Key: YOUR_ADMIN_API_KEY"
+# -> {"connected": true, "engine": "postgresql", "host": "...", "port": 5432, "database": "...", "source_schema": "esg", "error": null}
+```
+
+`"connected": false` comes with a populated `"error"` (the raw driver exception) instead of a stack trace — bounded by `SOURCE_DB_CONNECT_TIMEOUT_SECONDS` (default 10s) so an unreachable host fails fast rather than hanging.
+
+**Recommended: trigger ingestion over the API**, so it's trackable and doesn't need shell access to wherever the service runs:
 
 ```bash
 curl -X POST http://localhost:8000/admin/ingest -H "X-Admin-Api-Key: YOUR_ADMIN_API_KEY" -H "Content-Type: application/json" -d '{}'

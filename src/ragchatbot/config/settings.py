@@ -20,6 +20,17 @@ RDBMS_DRIVERS: dict[str, str] = {
     "oracle": "oracle+oracledb",
 }
 
+# Each DBAPI names its connect-timeout kwarg differently — without this, a
+# genuinely unreachable host relies on the OS's TCP connect timeout, which
+# can be 20s+ (or hang indefinitely on a filtered/blackholed port) rather
+# than failing fast. Used by db/source_adapter.py::build_engine.
+RDBMS_CONNECT_TIMEOUT_KWARG: dict[str, str] = {
+    "postgresql": "connect_timeout",
+    "mysql": "connect_timeout",
+    "mssql": "timeout",
+    "oracle": "tcp_connect_timeout",
+}
+
 RDBMSEngine = Literal["postgresql", "mysql", "mssql", "oracle"]
 ProviderName = Literal["ollama", "azure_openai"]
 
@@ -82,6 +93,18 @@ class Settings(BaseSettings):
     source_db_password: SecretStr = SecretStr("postgres")
     source_db_name: str = "app"
     source_db_driver_override: str | None = None
+    # Bounds how long a connection attempt (e.g. /admin/source-db/status,
+    # or any ingestion run) waits before giving up on an unreachable host —
+    # without this, the OS's own TCP timeout applies, which can be 20s+ or
+    # effectively indefinite against a filtered/blackholed port.
+    source_db_connect_timeout_seconds: int = 10
+    # Default schema for tables that don't set their own `schema:` in
+    # tables.yaml. Deliberately an env var, not a tables.yaml field-only
+    # concept: which schema holds your tables is a per-environment fact
+    # (varies machine to machine, dev vs. prod), not something that should
+    # be hardcoded in a config file that's typically shared/committed.
+    # Per-table `schema:` in tables.yaml still overrides this when set.
+    source_db_schema: str | None = None
 
     # -- Vector store (FR-1.7): independently configured, defaults to a
     # dedicated pgvector-enabled PostgreSQL instance regardless of what the

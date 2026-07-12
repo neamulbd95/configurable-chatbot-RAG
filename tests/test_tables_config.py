@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from ragchatbot.config.tables import RelationConfig, TableConfig
+from ragchatbot.config.tables import RelationConfig, TableConfig, load_table_configs
 
 
 def test_table_config_defaults():
@@ -81,3 +81,54 @@ def test_two_tables_same_name_different_schema_have_distinct_identity():
     archive_products = TableConfig(name="products", primary_key="id", schema="archive")
 
     assert sales_products.qualified_name != archive_products.qualified_name
+
+
+def _write_tables_yaml(tmp_path, content: str):
+    path = tmp_path / "tables.yaml"
+    path.write_text(content, encoding="utf-8")
+    return path
+
+
+def test_load_table_configs_applies_default_schema_when_table_omits_it(tmp_path):
+    path = _write_tables_yaml(
+        tmp_path,
+        "tables:\n"
+        "  - name: asset\n"
+        "    primary_key: id\n"
+        "    relations:\n"
+        "      - table: valuation\n"
+        "        local_key: id\n"
+        "        foreign_key: asset_id\n",
+    )
+
+    tables = load_table_configs(path, default_schema="esg")
+
+    assert tables[0].schema_name == "esg"
+    assert tables[0].qualified_name == "esg.asset"
+    # Relations without their own schema inherit the default too.
+    assert tables[0].relations[0].schema_name == "esg"
+
+
+def test_load_table_configs_per_table_schema_overrides_default(tmp_path):
+    path = _write_tables_yaml(
+        tmp_path,
+        "tables:\n"
+        "  - name: asset\n"
+        "    primary_key: id\n"
+        "    schema: archive\n",
+    )
+
+    tables = load_table_configs(path, default_schema="esg")
+
+    assert tables[0].schema_name == "archive"
+
+
+def test_load_table_configs_without_default_schema_leaves_it_unset(tmp_path):
+    path = _write_tables_yaml(
+        tmp_path, "tables:\n  - name: products\n    primary_key: id\n"
+    )
+
+    tables = load_table_configs(path)
+
+    assert tables[0].schema_name is None
+    assert tables[0].qualified_name == "products"

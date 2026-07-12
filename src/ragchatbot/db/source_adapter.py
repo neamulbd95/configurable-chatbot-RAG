@@ -11,11 +11,15 @@ from collections.abc import Iterator
 from sqlalchemy import MetaData, Table, create_engine, select
 from sqlalchemy.engine import Engine
 
-from ragchatbot.config.settings import DatabaseSettings
+from ragchatbot.config.settings import RDBMS_CONNECT_TIMEOUT_KWARG, DatabaseSettings
 
 
-def build_engine(db_settings: DatabaseSettings) -> Engine:
-    return create_engine(db_settings.sqlalchemy_url(), pool_pre_ping=True, future=True)
+def build_engine(db_settings: DatabaseSettings, connect_timeout_seconds: int = 10) -> Engine:
+    timeout_kwarg = RDBMS_CONNECT_TIMEOUT_KWARG.get(db_settings.engine)
+    connect_args = {timeout_kwarg: connect_timeout_seconds} if timeout_kwarg else {}
+    return create_engine(
+        db_settings.sqlalchemy_url(), pool_pre_ping=True, future=True, connect_args=connect_args
+    )
 
 
 def reflect_table(engine: Engine, table_name: str, schema: str | None = None) -> Table:

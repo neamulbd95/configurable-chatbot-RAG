@@ -34,8 +34,15 @@ class DimensionMismatchError(ValueError):
     column's configured dimension (FR-2.3)."""
 
 
-def build_vector_engine(db_settings: DatabaseSettings) -> Engine:
-    return create_engine(db_settings.sqlalchemy_url(), pool_pre_ping=True, future=True)
+def build_vector_engine(db_settings: DatabaseSettings, connect_timeout_seconds: int = 10) -> Engine:
+    # Always postgresql (see module docstring) — psycopg's connect_timeout
+    # kwarg directly, no dialect lookup needed like source_adapter.build_engine.
+    return create_engine(
+        db_settings.sqlalchemy_url(),
+        pool_pre_ping=True,
+        future=True,
+        connect_args={"connect_timeout": connect_timeout_seconds},
+    )
 
 
 def get_chunks_table(table_name: str, dimension: int) -> Table:
