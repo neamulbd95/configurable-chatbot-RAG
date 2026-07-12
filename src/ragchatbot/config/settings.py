@@ -7,7 +7,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # SQLAlchemy driver per supported RDBMS engine (FR-1.1, FR-1.6). Adding a new
@@ -24,6 +24,15 @@ RDBMSEngine = Literal["postgresql", "mysql", "mssql", "oracle"]
 ProviderName = Literal["ollama", "azure_openai"]
 
 
+def _normalize_literal(value: object) -> object:
+    """Env vars are easy to typo with hyphens/case that don't match the
+    Literal exactly (e.g. "azure-openai" instead of "azure_openai"). Rather
+    than fail with a cryptic pydantic error, normalize before validating."""
+    if isinstance(value, str):
+        return value.strip().lower().replace("-", "_")
+    return value
+
+
 class DatabaseSettings(BaseSettings):
     """Connection settings shared by the source RDBMS and the vector store.
     Two independent instances of this are used so the vector store is never
@@ -36,6 +45,8 @@ class DatabaseSettings(BaseSettings):
     password: SecretStr = SecretStr("postgres")
     database: str = "postgres"
     driver_override: str | None = None
+
+    _normalize_engine = field_validator("engine", mode="before")(_normalize_literal)
 
     def sqlalchemy_url(self) -> str:
         driver = self.driver_override or RDBMS_DRIVERS[self.engine]
@@ -117,6 +128,14 @@ class Settings(BaseSettings):
     azure_openai_api_version: str = "2024-10-21"
     azure_openai_chat_deployment: str | None = None
     azure_openai_embedding_deployment: str | None = None
+
+    _normalize_source_db_engine = field_validator("source_db_engine", mode="before")(
+        _normalize_literal
+    )
+    _normalize_embedding_provider = field_validator("embedding_provider", mode="before")(
+        _normalize_literal
+    )
+    _normalize_chat_provider = field_validator("chat_provider", mode="before")(_normalize_literal)
 
     def source_db(self) -> DatabaseSettings:
         return DatabaseSettings(

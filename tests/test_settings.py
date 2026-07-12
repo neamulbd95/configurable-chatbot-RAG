@@ -24,6 +24,25 @@ def test_sqlalchemy_url_driver_override():
     assert db.sqlalchemy_url() == "postgresql+asyncpg://u:p@h:5432/d"
 
 
+def test_provider_and_engine_literals_tolerate_hyphens_and_case():
+    # "azure-openai" is an easy env-var typo for "azure_openai" — should
+    # normalize instead of raising a pydantic ValidationError at startup.
+    settings = Settings(
+        embedding_provider="azure-openai",
+        chat_provider="AZURE-OpenAI",
+        source_db_engine="PostgreSQL",
+    )
+
+    assert settings.embedding_provider == "azure_openai"
+    assert settings.chat_provider == "azure_openai"
+    assert settings.source_db_engine == "postgresql"
+
+
+def test_database_settings_engine_tolerates_hyphens_and_case():
+    db = DatabaseSettings(engine="MySQL")
+    assert db.engine == "mysql"
+
+
 def test_settings_source_db_and_vector_db_are_independent():
     settings = Settings(
         source_db_engine="mysql",
