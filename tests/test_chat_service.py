@@ -1,7 +1,7 @@
 import pytest
 
 from ragchatbot.chat.schemas import ChatRequest
-from ragchatbot.chat.service import UNGROUNDED_ANSWER, ChatService
+from ragchatbot.chat.service import UNGROUNDED_ANSWER, ChatProviderError, ChatService
 from ragchatbot.models import ChunkRecord, RetrievedChunk
 from ragchatbot.providers.base import ChatMessage, ChatProvider
 from ragchatbot.retrieval.pipeline import ContextPackage
@@ -71,3 +71,16 @@ async def test_history_is_threaded_into_messages_before_the_question():
     assert provider.received_messages[2] == history[1]
     assert provider.received_messages[-1]["role"] == "user"
     assert "price?" in provider.received_messages[-1]["content"]
+
+
+class FailingChatProvider(ChatProvider):
+    async def generate(self, messages: list[ChatMessage]) -> str:
+        raise RuntimeError("Error code: 403 - {'error': {'code': '403', 'message': 'blocked'}}")
+
+
+@pytest.mark.asyncio
+async def test_provider_failure_is_wrapped_with_identifying_prefix():
+    service = ChatService(FailingChatProvider())
+
+    with pytest.raises(ChatProviderError, match="Chat provider call failed"):
+        await service.answer(ChatRequest(message="price?"), _grounded_context())

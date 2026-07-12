@@ -9,8 +9,10 @@ from __future__ import annotations
 import uuid
 
 from ragchatbot.chat.schemas import ChatRequest, ChatResponse, Citation
-from ragchatbot.providers.base import ChatMessage, ChatProvider
+from ragchatbot.providers.base import ChatMessage, ChatProvider, ChatProviderError
 from ragchatbot.retrieval.pipeline import ContextPackage
+
+__all__ = ["ChatProviderError", "ChatService"]
 
 SYSTEM_PROMPT = (
     "You are a grounded assistant. Answer ONLY using the provided context. "
@@ -48,7 +50,10 @@ class ChatService:
             messages.append({"role": turn["role"], "content": turn["content"]})  # type: ignore[typeddict-item]
         messages.append({"role": "user", "content": user_prompt})
 
-        answer = await self._chat_provider.generate(messages)
+        try:
+            answer = await self._chat_provider.generate(messages)
+        except Exception as exc:
+            raise ChatProviderError(f"Chat provider call failed: {exc}") from exc
 
         return ChatResponse(
             answer=answer,

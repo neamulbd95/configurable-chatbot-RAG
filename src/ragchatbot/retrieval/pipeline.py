@@ -9,7 +9,7 @@ from sqlalchemy.engine import Engine
 
 from ragchatbot.db.vector_store import hybrid_search, similarity_search
 from ragchatbot.models import RetrievedChunk
-from ragchatbot.providers.base import EmbeddingProvider
+from ragchatbot.providers.base import EmbeddingProvider, EmbeddingProviderError
 from ragchatbot.retrieval.reranker import Reranker
 
 
@@ -48,7 +48,12 @@ async def retrieve(
     caller_roles: list[str] | None = None,
     reranker: Reranker | None = None,
 ) -> ContextPackage:
-    [query_embedding] = await embedding_provider.embed([query])
+    try:
+        [query_embedding] = await embedding_provider.embed([query])
+    except EmbeddingProviderError:
+        raise
+    except Exception as exc:
+        raise EmbeddingProviderError(f"Embedding provider call failed: {exc}") from exc
 
     if keyword_weight > 0:
         results = hybrid_search(

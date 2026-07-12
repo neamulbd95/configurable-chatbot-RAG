@@ -14,6 +14,16 @@ from sqlalchemy.engine import Engine
 from ragchatbot.config.settings import RDBMS_CONNECT_TIMEOUT_KWARG, DatabaseSettings
 
 
+class SourceDBError(RuntimeError):
+    """Wraps any exception from talking to the source RDBMS (connection
+    failure, missing table/schema, auth, query error) with a prefix that
+    identifies the source DB as the failing component — as opposed to the
+    embedding/chat provider or the vector store, which fail at different
+    pipeline stages and would otherwise be indistinguishable from this one
+    in a job's bare error string (see providers/base.py for the same
+    pattern applied to provider calls)."""
+
+
 def build_engine(db_settings: DatabaseSettings, connect_timeout_seconds: int = 10) -> Engine:
     timeout_kwarg = RDBMS_CONNECT_TIMEOUT_KWARG.get(db_settings.engine)
     connect_args = {timeout_kwarg: connect_timeout_seconds} if timeout_kwarg else {}
@@ -24,7 +34,11 @@ def build_engine(db_settings: DatabaseSettings, connect_timeout_seconds: int = 1
 
 def reflect_table(engine: Engine, table_name: str, schema: str | None = None) -> Table:
     metadata = MetaData()
-    return Table(table_name, metadata, autoload_with=engine, schema=schema)
+    qualified = f"{schema}.{table_name}" if schema else table_name
+    try:
+        return Table(table_name, metadata, autoload_with=engine, schema=schema)
+    except Exception as exc:
+        raise SourceDBError(f"Source DB table lookup failed for '{qualified}': {exc}") from exc
 
 
 class SourceTableReader:
@@ -51,17 +65,27 @@ class SourceTableReader:
         only rows updated since that value are returned (FR-1.5)."""
         order_column = self.table.primary_key.columns.values()[0]
         offset = 0
-        with self.engine.connect() as conn:
-            while True:
-                stmt = select(self.table).order_by(order_column).limit(self.batch_size).offset(offset)
-                if watermark_column is not None and watermark_since is not None:
-                    stmt = stmt.where(self.table.c[watermark_column] > watermark_since)
+        try:
+            with self.engine.connect() as conn:
+                while True:
+                    stmt = (
+                        select(self.table)
+                        .order_by(order_column)
+                        .limit(self.batch_size)
+                        .offset(offset)
+                    )
+                    if watermark_column is not None and watermark_since is not None:
+                        stmt = stmt.where(self.table.c[watermark_column] > watermark_since)
 
-                rows = conn.execute(stmt).mappings().all()
-                if not rows:
-                    return
-                for row in rows:
-                    yield dict(row)
-                if len(rows) < self.batch_size:
-                    return
-                offset += self.batch_size
+                    rows = conn.execute(stmt).mappings().all()
+                    if not rows:
+                        return
+                    for row in rows:
+                        yield dict(row)
+                    if len(rows) < self.batch_size:
+                        return
+                    offset += self.batch_size
+        except SourceDBError:
+            raise
+        except Exception as exc:
+            raise SourceDBError(f"Source DB read failed for '{self.table.name}': {exc}") from exc

@@ -8,6 +8,7 @@ from fastapi import Header, HTTPException, Request, status
 
 from ragchatbot.db.session_store import ensure_session_schema
 from ragchatbot.db.vector_store import ensure_schema
+from ragchatbot.providers.base import EmbeddingProviderError
 
 
 async def get_vector_table(request: Request):
@@ -15,7 +16,10 @@ async def get_vector_table(request: Request):
     if app.state.vector_table is None:
         # Embedding dimension is only known once the provider has run at
         # least once; this also lazily creates the pgvector extension/table.
-        await app.state.embedding_provider.embed(["dimension probe"])
+        try:
+            await app.state.embedding_provider.embed(["dimension probe"])
+        except Exception as exc:
+            raise EmbeddingProviderError(f"Embedding provider call failed: {exc}") from exc
         app.state.vector_table = ensure_schema(
             app.state.vector_engine,
             app.state.settings.vector_table_name,

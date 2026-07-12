@@ -10,7 +10,7 @@ from sqlalchemy import Table, select
 from sqlalchemy.engine import Engine
 
 from ragchatbot.config.tables import RelationConfig, TableConfig
-from ragchatbot.db.source_adapter import SourceTableReader, reflect_table
+from ragchatbot.db.source_adapter import SourceDBError, SourceTableReader, reflect_table
 from ragchatbot.models import SourceRecord
 
 
@@ -19,8 +19,11 @@ def _fetch_related_rows(
 ) -> list[dict[str, object]]:
     fk_col = related_table.c[relation.foreign_key]
     stmt = select(related_table).where(fk_col == local_value).limit(relation.max_related_rows)
-    with engine.connect() as conn:
-        rows = conn.execute(stmt).mappings().all()
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(stmt).mappings().all()
+    except Exception as exc:
+        raise SourceDBError(f"Source DB relation read failed for '{related_table.name}': {exc}") from exc
     return [
         {k: v for k, v in dict(row).items() if k not in relation.exclude_columns} for row in rows
     ]

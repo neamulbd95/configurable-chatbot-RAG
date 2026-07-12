@@ -4,7 +4,9 @@ dimension consistency (FR-2.2, FR-2.3) before chunks reach the vector store."""
 from __future__ import annotations
 
 from ragchatbot.models import ChunkRecord
-from ragchatbot.providers.base import EmbeddingProvider
+from ragchatbot.providers.base import EmbeddingProvider, EmbeddingProviderError
+
+__all__ = ["EmbeddingDimensionError", "EmbeddingProviderError", "embed_chunks"]
 
 
 class EmbeddingDimensionError(ValueError):
@@ -17,7 +19,10 @@ async def embed_chunks(
     if not chunks:
         return []
 
-    vectors = await provider.embed([c.chunk_text for c in chunks])
+    try:
+        vectors = await provider.embed([c.chunk_text for c in chunks])
+    except Exception as exc:
+        raise EmbeddingProviderError(f"Embedding provider call failed: {exc}") from exc
     if len(vectors) != len(chunks):
         raise EmbeddingDimensionError(
             f"Provider returned {len(vectors)} embeddings for {len(chunks)} chunks"
