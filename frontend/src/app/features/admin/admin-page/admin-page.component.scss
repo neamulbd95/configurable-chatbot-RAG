@@ -1,0 +1,42 @@
+@use 'tokens' as *;
+
+.admin-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: $space-lg;
+  display: flex;
+  flex-direction: column;
+  gap: $space-md;
+}
+
+.key-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-sm;
+  font-size: $font-size-sm;
+}
+
+.key-card__hint {
+  color: $color-grey-500;
+}
+
+.key-card__actions {
+  display: flex;
+  gap: $space-xs;
+}
+
+.key-card__input {
+  flex: 1;
+  padding: $space-xs $space-sm;
+  border: 1px solid $color-grey-300;
+  border-radius: $radius-sm;
+  font-family: $font-family-base;
+  font-size: $font-size-sm;
+}
+
+.admin-page__panels {
+  display: flex;
+  flex-direction: column;
+  gap: $space-md;
+}

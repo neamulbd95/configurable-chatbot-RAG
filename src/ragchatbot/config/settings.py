@@ -79,6 +79,10 @@ class Settings(BaseSettings):
     app_host: str = "0.0.0.0"
     app_port: int = 8000
     log_level: str = "INFO"
+    # Comma-separated list of origins allowed to call this API from a
+    # browser (e.g. the Angular dev server). Defaults to Angular CLI's
+    # default dev port; add your deployed frontend's origin in production.
+    cors_allowed_origins: str = "http://localhost:4200"
 
     # -- Admin API (vector store reset, ingestion trigger/status) --
     # If unset, /admin/* endpoints are unauthenticated — fine for local dev,
@@ -159,6 +163,10 @@ class Settings(BaseSettings):
         _normalize_literal
     )
     _normalize_chat_provider = field_validator("chat_provider", mode="before")(_normalize_literal)
+
+    @property
+    def cors_allowed_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
 
     def source_db(self) -> DatabaseSettings:
         return DatabaseSettings(

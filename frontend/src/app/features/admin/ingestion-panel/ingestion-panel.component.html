@@ -1,0 +1,40 @@
+<mtf-card>
+  <h3>Ingestion</h3>
+  <p class="panel-hint">
+    Leave the table list empty to ingest everything in <code>config/tables.yaml</code>, or list
+    specific (optionally schema-qualified) table names, comma-separated.
+  </p>
+
+  <div class="ingest-form">
+    <input
+      class="ingest-form__input"
+      type="text"
+      placeholder="e.g. products, esg.asset"
+      [(ngModel)]="tablesInput"
+    />
+    <mtf-button (click)="start()" [loading]="starting()" [disabled]="starting()">
+      Trigger ingestion
+    </mtf-button>
+  </div>
+
+  <mtf-alert tone="danger" *ngIf="requestError()">{{ requestError() }}</mtf-alert>
+
+  <div class="job" *ngIf="job() as j">
+    <div class="job__row">
+      <span class="job__label">Job</span>
+      <code>{{ j.job_id }}</code>
+      <mtf-badge [tone]="statusTone(j.status)">{{ j.status }}</mtf-badge>
+    </div>
+    <div class="job__row">
+      <span class="job__label">Tables</span>
+      <span>{{ j.tables.join(', ') || '—' }}</span>
+    </div>
+    <div class="job__row" *ngIf="j.stats">
+      <span class="job__label">Chunks</span>
+      <span>
+        <span *ngFor="let entry of j.stats | keyvalue" class="job__stat">{{ entry.key }}: {{ entry.value }}</span>
+      </span>
+    </div>
+    <mtf-alert tone="danger" *ngIf="j.error">{{ j.error }}</mtf-alert>
+  </div>
+</mtf-card>

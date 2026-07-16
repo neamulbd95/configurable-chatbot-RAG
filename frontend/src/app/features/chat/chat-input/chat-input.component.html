@@ -1,0 +1,13 @@
+<div class="chat-input">
+  <textarea
+    class="chat-input__field"
+    rows="1"
+    placeholder="Ask a question about your data…"
+    [(ngModel)]="value"
+    (keydown)="onKeydown($event)"
+    [disabled]="disabled"
+  ></textarea>
+  <mtf-button (click)="submit()" [disabled]="disabled || !value.trim()" [loading]="disabled">
+    Send
+  </mtf-button>
+</div>

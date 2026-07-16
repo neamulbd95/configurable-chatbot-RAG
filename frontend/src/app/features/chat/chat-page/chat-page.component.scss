@@ -1,0 +1,47 @@
+@use 'tokens' as *;
+
+.chat-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: $space-lg;
+  gap: $space-md;
+}
+
+.chat-page__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.chat-page__subtitle {
+  color: $color-grey-500;
+  font-size: $font-size-sm;
+
+  code {
+    background: $color-grey-100;
+    padding: 1px 4px;
+    border-radius: $radius-sm;
+  }
+}
+
+.chat-page__card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chat-page__messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: $space-lg;
+}
+
+.chat-page__empty {
+  color: $color-grey-500;
+  text-align: center;
+  margin-top: $space-2xl;
+}

@@ -1,0 +1,43 @@
+@use 'tokens' as *;
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $space-sm;
+
+  h3 {
+    margin: 0;
+  }
+}
+
+.panel-loading {
+  display: flex;
+  align-items: center;
+  gap: $space-xs;
+  color: $color-grey-500;
+  font-size: $font-size-sm;
+  margin-bottom: $space-sm;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: $space-2xs $space-md;
+  margin: 0;
+  font-size: $font-size-sm;
+
+  dt {
+    color: $color-grey-500;
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.status-grid__error {
+  color: $color-danger;
+  font-family: monospace;
+  word-break: break-word;
+}

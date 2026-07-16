@@ -1,0 +1,15 @@
+@use 'tokens' as *;
+
+.mtf-spinner {
+  display: inline-block;
+  border-radius: 50%;
+  border: 2.5px solid $color-grey-200;
+  border-top-color: $color-ink;
+  animation: mtf-spinner-spin 0.7s linear infinite;
+}
+
+@keyframes mtf-spinner-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

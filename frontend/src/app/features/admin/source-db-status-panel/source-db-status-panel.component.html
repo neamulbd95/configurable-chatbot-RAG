@@ -1,0 +1,37 @@
+<mtf-card>
+  <div class="panel-header">
+    <h3>Source database</h3>
+    <mtf-button variant="ghost" (click)="refresh()" [disabled]="loading()">Refresh</mtf-button>
+  </div>
+
+  <div class="panel-loading" *ngIf="loading()">
+    <mtf-spinner [size]="16"></mtf-spinner>
+    <span>Checking connection…</span>
+  </div>
+
+  <mtf-alert tone="danger" *ngIf="requestError()">{{ requestError() }}</mtf-alert>
+
+  <dl class="status-grid" *ngIf="status() as s">
+    <dt>Connected</dt>
+    <dd>
+      <mtf-badge [tone]="s.connected ? 'success' : 'danger'">{{ s.connected ? 'Yes' : 'No' }}</mtf-badge>
+    </dd>
+
+    <dt>Engine</dt>
+    <dd>{{ s.engine }}</dd>
+
+    <dt>Host</dt>
+    <dd>{{ s.host }}:{{ s.port }}</dd>
+
+    <dt>Database</dt>
+    <dd>{{ s.database }}</dd>
+
+    <dt>Schema</dt>
+    <dd>{{ s.source_schema || '(default)' }}</dd>
+
+    <ng-container *ngIf="s.error">
+      <dt>Error</dt>
+      <dd class="status-grid__error">{{ s.error }}</dd>
+    </ng-container>
+  </dl>
+</mtf-card>

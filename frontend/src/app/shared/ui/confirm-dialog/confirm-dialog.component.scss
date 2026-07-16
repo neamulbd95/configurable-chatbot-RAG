@@ -1,0 +1,34 @@
+@use 'tokens' as *;
+
+.mtf-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 26, 36, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.mtf-confirm {
+  background: $color-white;
+  border-radius: $radius-md;
+  box-shadow: $shadow-lg;
+  padding: $space-lg;
+  width: min(420px, calc(100vw - #{$space-lg * 2}));
+
+  h3 {
+    margin-bottom: $space-xs;
+  }
+
+  p {
+    color: $color-grey-700;
+    margin-bottom: $space-lg;
+  }
+}
+
+.mtf-confirm__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: $space-xs;
+}

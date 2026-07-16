@@ -190,6 +190,16 @@ Three points vary by deployment and are each hidden behind a config-selected ada
 - [x] `GET /admin/source-db/status` — actual source-DB connectivity check (`SELECT 1`, bounded by `SOURCE_DB_CONNECT_TIMEOUT_SECONDS`), distinct from `/health`/`/ready` which only prove the app process is up
 - [x] Live validation of all four endpoints against a running Postgres + Ollama stack — verified 2026-07-12: ingest (with relation join), job status polling, reset (auth rejection, confirm-guard, actual deletion), and source-db status (including a reproduced-then-fixed `NoSuchTableError` via `SOURCE_DB_SCHEMA`) all confirmed against real containers
 
+### Epic 15: Angular Frontend (beyond original scope)
+- [x] CORS middleware added to the API (`CORS_ALLOWED_ORIGINS` setting, default `http://localhost:4200`) — required for any browser-based frontend to call this API at all
+- [x] Angular 18 standalone-component app (`frontend/`) with chat + admin routes
+- [x] Design-token system approximating EY's Motif visual language — no public Angular package for Motif was found (React-oriented/EY-internal at best), so this is an independent approximation, not the certified component library; documented as such in `frontend/README.md`
+- [x] Chat UI: message thread, citations, confidence badge, grounded/ungrounded state, session persisted in `localStorage` across reloads
+- [x] Admin UI: source-DB status, ingestion trigger + live job-status polling, vector-store reset with a confirm dialog; admin key entered once and stored in `localStorage`, attached only to `/admin/*` requests via an `HttpInterceptor`
+- [x] Dev and production builds both verified passing (production bundle ~84 kB transferred, within budget)
+- [~] Live-verified at the network level only: CORS preflight, `/chat`, and `/admin/*` all confirmed working end-to-end against the real backend with `Origin: http://localhost:4200` — **not** visually verified in an actual rendered browser (no headless-browser tooling was available in the build environment)
+- [ ] No automated frontend tests written beyond the default `app.component.spec.ts`
+
 ---
 
 ## 4. Suggested Build Order

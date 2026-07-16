@@ -1,0 +1,55 @@
+@use 'tokens' as *;
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: $font-family-base;
+  font-size: $font-size-md;
+  color: $color-ink;
+  background: $color-grey-050;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0 0 $space-sm;
+  font-weight: $font-weight-bold;
+  color: $color-ink;
+}
+
+p {
+  margin: 0 0 $space-sm;
+  line-height: 1.5;
+}
+
+a {
+  color: $color-info;
+}
+
+button {
+  font-family: inherit;
+}
+
+::selection {
+  background: $color-brand-yellow;
+  color: $color-ink;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

@@ -1,0 +1,38 @@
+<div class="admin-page">
+  <h2>Admin</h2>
+
+  <mtf-card class="key-card">
+    <div class="key-card__row" *ngIf="!editingKey()">
+      <span>
+        Admin key: <strong>{{ auth.apiKey() ? '••••••••' : 'not set' }}</strong>
+        <span class="key-card__hint" *ngIf="!auth.apiKey()">
+          — only needed if ADMIN_API_KEY is configured on the backend.
+        </span>
+      </span>
+      <div class="key-card__actions">
+        <mtf-button variant="secondary" (click)="editingKey.set(true)">
+          {{ auth.apiKey() ? 'Change' : 'Set key' }}
+        </mtf-button>
+        <mtf-button variant="ghost" *ngIf="auth.apiKey()" (click)="clearKey()">Clear</mtf-button>
+      </div>
+    </div>
+
+    <div class="key-card__row" *ngIf="editingKey()">
+      <input
+        class="key-card__input"
+        type="password"
+        placeholder="ADMIN_API_KEY"
+        [(ngModel)]="keyInput"
+        (keydown.enter)="saveKey()"
+      />
+      <mtf-button (click)="saveKey()">Save</mtf-button>
+      <mtf-button variant="ghost" (click)="editingKey.set(false)">Cancel</mtf-button>
+    </div>
+  </mtf-card>
+
+  <div class="admin-page__panels">
+    <app-source-db-status-panel></app-source-db-status-panel>
+    <app-ingestion-panel></app-ingestion-panel>
+    <app-reset-panel></app-reset-panel>
+  </div>
+</div>

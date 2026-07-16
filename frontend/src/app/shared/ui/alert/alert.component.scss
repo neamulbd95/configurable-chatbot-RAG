@@ -1,0 +1,33 @@
+@use 'tokens' as *;
+
+.mtf-alert {
+  padding: $space-sm $space-md;
+  border-radius: $radius-sm;
+  border-left: 4px solid transparent;
+  font-size: $font-size-sm;
+  line-height: 1.5;
+}
+
+.mtf-alert--info {
+  background: $color-info-bg;
+  border-left-color: $color-info;
+  color: $color-ink;
+}
+
+.mtf-alert--success {
+  background: $color-success-bg;
+  border-left-color: $color-success;
+  color: $color-ink;
+}
+
+.mtf-alert--danger {
+  background: $color-danger-bg;
+  border-left-color: $color-danger;
+  color: $color-ink;
+}
+
+.mtf-alert--warning {
+  background: $color-warning-bg;
+  border-left-color: $color-warning;
+  color: $color-ink;
+}

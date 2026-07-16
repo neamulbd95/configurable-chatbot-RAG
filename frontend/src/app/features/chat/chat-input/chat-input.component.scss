@@ -1,0 +1,32 @@
+@use 'tokens' as *;
+
+.chat-input {
+  display: flex;
+  align-items: flex-end;
+  gap: $space-sm;
+  padding: $space-md;
+  background: $color-white;
+  border-top: 1px solid $color-grey-200;
+}
+
+.chat-input__field {
+  flex: 1;
+  resize: none;
+  max-height: 140px;
+  min-height: 40px;
+  padding: $space-xs $space-sm;
+  border: 1px solid $color-grey-300;
+  border-radius: $radius-sm;
+  font-family: $font-family-base;
+  font-size: $font-size-md;
+  line-height: 1.4;
+
+  &:focus-visible {
+    outline: 2px solid $color-info;
+    outline-offset: 1px;
+  }
+
+  &:disabled {
+    background: $color-grey-050;
+  }
+}

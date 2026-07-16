@@ -1,0 +1,80 @@
+@use 'sass:color';
+@use 'tokens' as *;
+
+.mtf-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: $space-xs;
+  height: 40px;
+  padding: 0 $space-md;
+  border-radius: $radius-sm;
+  border: 1px solid transparent;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-bold;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background-color $transition-fast, border-color $transition-fast, opacity $transition-fast;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $color-info;
+    outline-offset: 2px;
+  }
+}
+
+.mtf-button--primary {
+  background: $color-brand-yellow;
+  color: $color-ink;
+
+  &:hover:not(:disabled) {
+    background: $color-brand-yellow-dark;
+  }
+}
+
+.mtf-button--secondary {
+  background: $color-white;
+  color: $color-ink;
+  border-color: $color-grey-300;
+
+  &:hover:not(:disabled) {
+    background: $color-grey-100;
+  }
+}
+
+.mtf-button--danger {
+  background: $color-danger;
+  color: $color-white;
+
+  &:hover:not(:disabled) {
+    background: color.adjust($color-danger, $lightness: -8%);
+  }
+}
+
+.mtf-button--ghost {
+  background: transparent;
+  color: $color-ink;
+
+  &:hover:not(:disabled) {
+    background: $color-grey-100;
+  }
+}
+
+.mtf-button__spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: mtf-spin 0.7s linear infinite;
+}
+
+@keyframes mtf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

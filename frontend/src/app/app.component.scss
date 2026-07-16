@@ -1,0 +1,74 @@
+@use 'tokens' as *;
+
+:host {
+  display: block;
+  height: 100vh;
+}
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.shell__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 $space-lg;
+  height: 56px;
+  background: $color-ink;
+  color: $color-white;
+  flex: 0 0 auto;
+}
+
+.shell__brand {
+  display: flex;
+  align-items: baseline;
+  gap: $space-2xs;
+}
+
+.shell__brand-mark {
+  background: $color-brand-yellow;
+  color: $color-ink;
+  font-weight: $font-weight-bold;
+  padding: $space-3xs $space-xs;
+  border-radius: $radius-sm;
+  font-size: $font-size-sm;
+}
+
+.shell__brand-name {
+  font-weight: $font-weight-medium;
+  font-size: $font-size-md;
+}
+
+.shell__nav {
+  display: flex;
+  gap: $space-md;
+}
+
+.shell__nav-link {
+  color: $color-grey-300;
+  text-decoration: none;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  padding: $space-2xs 0;
+  border-bottom: 2px solid transparent;
+  transition: color $transition-fast, border-color $transition-fast;
+
+  &:hover {
+    color: $color-white;
+  }
+}
+
+.shell__nav-link--active {
+  color: $color-white;
+  border-bottom-color: $color-brand-yellow;
+}
+
+.shell__main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}

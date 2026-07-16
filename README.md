@@ -33,6 +33,10 @@ Both the source database engine and the LLM/embedding provider are swappable via
 - **Multi-turn conversational context**: chat sessions and message history are persisted, threaded back into the prompt on each turn, and truncated by a configurable message-count/character budget so long conversations can't blow out the model's context window
 - **Retrieval evaluation harness** (`scripts/eval_retrieval.py`): precision@K / recall@K against a labeled query set, for measuring hybrid-search and reranking changes against a baseline
 - **Operational ingestion API**: trigger ingestion (`POST /admin/ingest`) and poll its progress/result (`GET /admin/ingest/{job_id}`) over HTTP instead of shelling into the host to run the CLI; reset ingested data (`POST /admin/vector-store/reset`) with an explicit confirmation flag, which also clears the affected tables' persisted watermarks. Gated by an optional `ADMIN_API_KEY`.
+- **Source DB connectivity check** (`GET /admin/source-db/status`): a real `SELECT 1` against the source RDBMS, distinct from `/health`/`/ready` which only prove the app process is up.
+
+**Frontend**
+- **Angular chat + admin UI** ([`frontend/`](./frontend)): a chat interface (grounded answers, citations, confidence, multi-turn sessions) and an admin panel (source-DB status, ingestion trigger/poll, vector-store reset) against the API above, styled with a custom design-token system approximating EY's Motif visual language.
 
 ## USP — Why This Is Different
 
@@ -203,6 +207,22 @@ Builds and runs the app itself alongside its infrastructure, wired together via 
 cp config/eval_set.example.yaml config/eval_set.yaml   # fill in real queries + expected record IDs
 python scripts/eval_retrieval.py config/eval_set.yaml
 ```
+
+### 7. Run the frontend
+
+An Angular chat + admin UI lives in [`frontend/`](./frontend). It needs the API's CORS to allow its origin — set in `.env`:
+
+```bash
+CORS_ALLOWED_ORIGINS=http://localhost:4200   # already the default
+```
+
+```bash
+cd frontend
+npm install
+npx ng serve
+```
+
+Open `http://localhost:4200`. See [`frontend/README.md`](./frontend/README.md) for details, including the design-system approach (no public Angular package for EY's Motif design system was found, so it's approximated with custom tokens/components — see that README for specifics) and what wasn't verified (no browser-rendering check was possible in the build environment; verified instead at the network level — see that file for exactly what was and wasn't tested).
 
 ---
 

@@ -1,0 +1,31 @@
+<div class="bubble-row" [class.bubble-row--user]="message.role === 'user'">
+  <div class="bubble" [class.bubble--user]="message.role === 'user'" [class.bubble--error]="!!message.error">
+    <ng-container *ngIf="message.pending; else content">
+      <mtf-spinner [size]="16"></mtf-spinner>
+      <span class="bubble__pending-label">Thinking…</span>
+    </ng-container>
+
+    <ng-template #content>
+      <p class="bubble__text">{{ message.content }}</p>
+
+      <div class="bubble__meta" *ngIf="message.role === 'assistant' && !message.error">
+        <mtf-badge [tone]="message.grounded ? 'success' : 'neutral'">
+          {{ message.grounded ? 'Grounded' : 'No matching data' }}
+        </mtf-badge>
+        <mtf-badge *ngIf="message.grounded" [tone]="confidenceTone(message.confidence || 0)">
+          Confidence {{ (message.confidence || 0) | number: '1.0-2' }}
+        </mtf-badge>
+      </div>
+
+      <details class="bubble__citations" *ngIf="message.citations?.length">
+        <summary>{{ message.citations!.length }} citation(s)</summary>
+        <ul>
+          <li *ngFor="let citation of message.citations">
+            <code>{{ citation.source_table }}:{{ citation.primary_key }}</code>
+            <span class="bubble__citation-score">similarity {{ citation.similarity | number: '1.0-3' }}</span>
+          </li>
+        </ul>
+      </details>
+    </ng-template>
+  </div>
+</div>

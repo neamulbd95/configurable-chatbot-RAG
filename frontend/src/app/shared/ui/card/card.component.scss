@@ -1,0 +1,13 @@
+@use 'tokens' as *;
+
+.mtf-card {
+  background: $color-white;
+  border: 1px solid $color-grey-200;
+  border-radius: $radius-md;
+  box-shadow: $shadow-sm;
+  padding: $space-lg;
+}
+
+.mtf-card--flush {
+  padding: 0;
+}

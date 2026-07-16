@@ -1,0 +1,23 @@
+<div class="chat-page">
+  <div class="chat-page__header">
+    <div>
+      <h2>Chat</h2>
+      <p class="chat-page__subtitle">
+        Answers are grounded in your ingested data only.
+        <span *ngIf="session.sessionId()">Session: <code>{{ session.sessionId() }}</code></span>
+      </p>
+    </div>
+    <mtf-button variant="ghost" (click)="newSession()">New session</mtf-button>
+  </div>
+
+  <mtf-card class="chat-page__card" [flush]="true">
+    <div class="chat-page__messages">
+      <p class="chat-page__empty" *ngIf="messages().length === 0">
+        Ask a question about the data ingested into this service.
+      </p>
+      <app-message-bubble *ngFor="let message of messages()" [message]="message"></app-message-bubble>
+    </div>
+
+    <app-chat-input [disabled]="sending()" (send)="onSend($event)"></app-chat-input>
+  </mtf-card>
+</div>
