@@ -138,9 +138,15 @@ class Settings(BaseSettings):
     rerank_enabled: bool = False
     rerank_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
-    # -- Conversational context (FR-6.11-6.13) --
+    # -- Conversational context (FR-6.11-6.14) --
     history_max_messages: int = 6
     history_max_chars: int = 4000
+    # Rewrites a follow-up message into a standalone query (resolving
+    # pronouns/references like "this asset" against recent history) before
+    # retrieval — retrieval itself has no memory, only whatever query text
+    # it's given. Costs one extra LLM call per turn that has history; falls
+    # back to the raw message if the rewrite call itself fails.
+    query_rewrite_enabled: bool = True
 
     # -- Providers (FR-5.1-5.3): runtime-selectable, no code change to switch --
     embedding_provider: ProviderName = "ollama"

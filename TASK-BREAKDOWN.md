@@ -1,9 +1,9 @@
 # Execution Plan & Feature-Level Task Breakdown: Chatbot RAG
 
-**Related:** [PDR-chatbot-rag.md](./PDR-chatbot-rag.md) (PDR-CHATBOT-RAG-001, v1.2)
+**Related:** [PDR-chatbot-rag.md](./PDR-chatbot-rag.md) (PDR-CHATBOT-RAG-001, v1.3)
 **Status:** Phase 1 and Phase 2 implemented in code (unit-tested); live-infrastructure validation pending — pending ADR-CHATBOT-RAG-001 for formal architecture sign-off
 **Owner:** Neamul Haque Khan
-**Date:** 2026-07-09 (last updated)
+**Date:** 2026-07-16 (last updated)
 
 ---
 
@@ -171,12 +171,15 @@ Three points vary by deployment and are each hidden behind a config-selected ada
 - [x] Propagate `access_tags` from table config → chunk metadata — **FR-6.10**
 - [ ] Default-deny enforcement test against a live vector store: 100% of results respect caller scope — **NFR-2.2** *(filter logic itself is unit-tested; SQL-level integration not yet run)*
 
-### Epic 12: Conversational Context (FR-6.11–6.13)
+### Epic 12: Conversational Context (FR-6.11–6.14)
 - [x] Chat session record persistence (`chat_sessions`: `session_id`, `user_id`, timestamps) — backs FR-4.3/FR-6.12
 - [x] Chat message record persistence (`chat_messages`: `message_id`, `role`, `content`, `citations`) — **FR-6.12**
 - [x] Multi-turn context assembly into the message list within a configurable window — **FR-6.11**
 - [x] Truncation strategy for long sessions (`apply_history_budget`, message-count + char-budget sliding window) — **FR-6.13** *(summarization not implemented — truncation satisfies the requirement's "truncated/summarized" wording; documented as a future extension point)*
 - [ ] Latency check for history retrieval + prompt assembly — **NFR-2.4**
+- [x] Query rewriting (`chat/query_rewrite.py`): rewrites a follow-up with ambiguous references ("who owns this asset?") into a standalone query using recent history, before retrieval runs — **FR-6.14**. Configurable (`QUERY_REWRITE_ENABLED`, default on); fails open to the raw message if the rewrite LLM call itself errors, logging a warning rather than blocking the request
+- [x] Unit tests for the rewrite function (no-history fast path, history-driven rewrite, quote/whitespace stripping, fail-open on provider error) and a route-level test proving the rewritten query — not the raw message — is what reaches `retrieve()`, plus a test confirming the toggle is honored when disabled
+- [ ] Live validation against a real multi-turn conversation with a real LLM — built and unit-tested (102 tests passing) but not yet exercised against a live provider in this environment; motivated directly by a real support case where "who is the owner of this asset?" following "give a short summary on ESG Factsheet" risked retrieving the wrong (or no) entity, since retrieval had no memory of the prior turn
 
 ### Epic 13: Benchmarking & Quality Dashboards
 - [x] Retrieval quality eval script (`scripts/eval_retrieval.py`): precision@K/recall@K against a labeled eval set — usable for a before/after reranking baseline
@@ -199,6 +202,14 @@ Three points vary by deployment and are each hidden behind a config-selected ada
 - [x] Dev and production builds both verified passing (production bundle ~84 kB transferred, within budget)
 - [~] Live-verified at the network level only: CORS preflight, `/chat`, and `/admin/*` all confirmed working end-to-end against the real backend with `Origin: http://localhost:4200` — **not** visually verified in an actual rendered browser (no headless-browser tooling was available in the build environment)
 - [ ] No automated frontend tests written beyond the default `app.component.spec.ts`
+- [x] Fixed a real layout bug found via user testing: the chat input box disappeared after the first response. Root cause was a nested-flexbox gap — `CardComponent`'s own inner wrapper div never declared itself a flex container, so a parent's `display:flex` on the `<mtf-card>` host stopped one level too shallow; the messages area grew unbounded instead of scrolling internally, pushing the input past `.shell__main`'s `overflow:hidden` boundary. Fixed the flex/`min-height:0` chain through `CardComponent`, `ChatPageComponent`, and (proactively, same latent bug not yet triggered) `AdminPageComponent`. Verified via successful dev/prod rebuilds; not re-verified in an actual browser (same tooling gap as above)
+
+### Epic 16: Conversational Small-Talk Handling (FR-6.15, beyond original scope)
+- [x] `chat/small_talk.py::is_small_talk()` — deterministic, narrowly-anchored pattern match (greetings, thanks, goodbyes, "what can you do") requiring the *entire* trimmed message to match, so a real data question is never misclassified (e.g. `"hi, what's the price of the Widget?"` correctly falls through to the grounded path)
+- [x] `ChatService.answer_small_talk()` — a separate code path from `answer()`, using its own system prompt, that never touches retrieval and always returns `grounded: false, citations: []`
+- [x] `/chat` route wiring: small talk is checked before the retrieval branch and skips `get_vector_table()`/`retrieve()` entirely — no embedding call, no vector-store dependency, for a plain greeting
+- [x] Tests: pattern-match coverage (positive and negative cases) plus a route-level test using an embedding provider that raises `AssertionError` if called at all, proving retrieval is genuinely skipped, not just that the service method behaves correctly in isolation
+- [x] System prompt fix bundled with this work: the grounded-answer system prompt (FR-4.2 path) was rewritten to explicitly forbid copying the raw `field: value` normalized-text format verbatim into the answer — found live when a real query returned the raw chunk dump instead of a synthesized sentence
 
 ---
 
@@ -217,4 +228,6 @@ Three points vary by deployment and are each hidden behind a config-selected ada
 - **Phase 1:** All Epic 0, 0b, 1–7 tasks checked, PDR §1.3 Success Criteria met, NFR-1.1–1.8 targets validated in a load test (including cross-engine extraction and containerized deployment), provider swap smoke test passing.
 - **Phase 2:** All Epic 8–13 tasks checked, NFR-2.1–2.4 targets validated, RBAC default-deny test passing, eval set shows reranking improves precision@K over baseline.
 
-**Current state (2026-07-12):** all Phase 1 and Phase 2 application logic is implemented, covered by 49 unit tests, and has been exercised live end-to-end against real PostgreSQL + pgvector + Ollama (ingestion including relation joins, grounded `/chat` with citations, multi-turn session persistence, and all three admin API endpoints — see Epics 4, 7, 14 above). Still needing live validation, per the remaining `[~]`/`[ ]` markers above: MySQL/SQL Server/Oracle as a source engine (only PostgreSQL tested live), RBAC enforcement against a live vector store (no `access_tags` configured in the tested run), hybrid-search SQL execution, the optional cross-encoder reranker (`pip install .[rerank]`), Azure OpenAI as a live provider, and load/latency numbers against the NFR targets. Neither phase is "done" by this document's own Definition of Done until that remaining validation happens.
+**Current state (2026-07-16):** all Phase 1 and Phase 2 application logic — including the beyond-scope operational API (Epic 14), Angular frontend (Epic 15), and conversational small-talk/query-rewrite features (Epic 12 FR-6.14, Epic 16) — is implemented and covered by 102 backend unit/route-level tests, plus a production Angular build. Live end-to-end validation against real PostgreSQL + pgvector + Ollama covers ingestion (including relation joins and schema config), grounded `/chat` with citations, multi-turn session persistence, and all four admin API endpoints (Epics 4, 7, 14). **Azure OpenAI has now also been exercised live** — via a real support case working through a genuine VNet/firewall 403, confirming the provider wiring, error-wrapping, and `gpt-4o-mini` chat generation all work correctly end-to-end against a live Azure resource (not just Ollama). The two newest features (FR-6.14 query rewriting, FR-6.15 small talk) are unit- and route-tested with mocked providers but not yet exercised in a live multi-turn conversation with a real LLM.
+
+Still needing live validation, per the remaining `[~]`/`[ ]` markers above: MySQL/SQL Server/Oracle as a source engine (only PostgreSQL tested live), RBAC enforcement against a live vector store (no `access_tags` configured in the tested run), hybrid-search SQL execution, the optional cross-encoder reranker (`pip install .[rerank]`), load/latency numbers against the NFR targets, the frontend's CSS layout fix and small-talk/query-rewrite features in an actual rendered browser (no headless-browser tooling available in this build environment throughout). Neither phase is "done" by this document's own Definition of Done until that remaining validation happens.

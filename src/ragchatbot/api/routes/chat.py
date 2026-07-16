@@ -1,13 +1,16 @@
 """POST /chat — the documented chat endpoint contract (FR-4.1, FR-4.2),
 wired for hybrid retrieval, reranking, RBAC, and multi-turn session context
-(FR-6.6-6.13). Small talk (greetings, pleasantries) skips retrieval
-entirely — see chat/small_talk.py."""
+(FR-6.6-6.14). Small talk (greetings, pleasantries) skips retrieval
+entirely — see chat/small_talk.py. Follow-up questions with ambiguous
+references are rewritten into standalone queries before retrieval — see
+chat/query_rewrite.py."""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
 
 from ragchatbot.api.dependencies import get_session_engine, get_vector_table
+from ragchatbot.chat.query_rewrite import rewrite_query
 from ragchatbot.chat.schemas import ChatRequest, ChatResponse
 from ragchatbot.chat.service import ChatProviderError, ChatService
 from ragchatbot.chat.small_talk import is_small_talk
@@ -38,9 +41,15 @@ async def chat(payload: ChatRequest, request: Request) -> ChatResponse:
             # vector store to be reachable.
             response = await service.answer_small_talk(payload, history=history)
         else:
+            retrieval_query = payload.message
+            if settings.query_rewrite_enabled:
+                retrieval_query = await rewrite_query(
+                    request.app.state.chat_provider, payload.message, history
+                )
+
             vector_table = await get_vector_table(request)
             context = await retrieve(
-                query=payload.message,
+                query=retrieval_query,
                 embedding_provider=request.app.state.embedding_provider,
                 vector_engine=request.app.state.vector_engine,
                 vector_table=vector_table,
@@ -50,6 +59,9 @@ async def chat(payload: ChatRequest, request: Request) -> ChatResponse:
                 caller_roles=payload.roles,
                 reranker=request.app.state.reranker,
             )
+            # The answer is still generated from the user's original
+            # wording (payload.message) — rewriting only ever targets
+            # retrieval, never what the assistant thinks it was asked.
             response = await service.answer(payload, context, history=history)
     except (EmbeddingProviderError, ChatProviderError) as exc:
         # Provider-side failure (network, auth, firewall/VNet rejection,

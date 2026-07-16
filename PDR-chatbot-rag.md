@@ -1,7 +1,7 @@
 # Product Definition & Requirements: Interactive GenAI Chatbot with RAG
 
 **Document ID:** PDR-CHATBOT-RAG-001  
-**Version:** 1.2  
+**Version:** 1.3  
 **Date:** July 8, 2026  
 **Owner:** Neamul Haque Khan  
 **Status:** Draft  
@@ -103,6 +103,7 @@ Build an interactive GenAI chatbot that follows a full RAG lifecycle, starting w
 | FR-4.2 | Chat service invokes retrieval before generation | MUST | No ungrounded response path by default |
 | FR-4.3 | Accept and persist a session ID with each request (no context-aware generation) | SHOULD | Session ID stored with message log; not yet used in prompt construction — see FR-6.11 for context-aware generation |
 | FR-4.4 | Include citation references in answer payload | MUST | UI can display references |
+| FR-4.5 | Reference frontend implementation | SHOULD | A web UI consuming the chat/admin API contract is provided as a reference client, not just a documented contract |
 
 ### 3.5 Provider Configurability
 
@@ -151,6 +152,17 @@ Build an interactive GenAI chatbot that follows a full RAG lifecycle, starting w
 | FR-6.11 | Multi-turn, context-aware answer generation | MUST | Prior turns from the session are included in prompt construction within a configurable window |
 | FR-6.12 | Session and message history storage | MUST | Messages persisted per FR-4.3 session ID and retrievable by session |
 | FR-6.13 | Context window truncation/summarization strategy | SHOULD | Long sessions are truncated or summarized to fit the target model's context limit |
+| FR-6.14 | Context-aware query rewriting for retrieval | SHOULD | A follow-up message with an ambiguous reference (a pronoun, "this X") is rewritten into a standalone query using recent session history *before* retrieval runs, so retrieval — which has no memory of its own — targets the right entity instead of the literal follow-up text. Configurable; falls back to the raw message if the rewrite call itself fails, rather than blocking the request |
+| FR-6.15 | Conversational small-talk handling | SHOULD | Greetings and pleasantries (e.g. "good morning", "thanks") bypass the grounded-retrieval gate (FR-4.2) entirely and receive a natural conversational reply, instead of being forced through the "I don't have enough information" fallback meant for genuine data questions that failed to retrieve |
+
+#### 3.6.6 Operational API
+
+| ID | Requirement | Priority | Acceptance Criteria |
+|----|-------------|----------|---------------------|
+| FR-6.16 | Trigger ingestion over HTTP as a trackable background job | SHOULD | Endpoint accepts an optional table-scope list and returns a job ID immediately; the run itself happens asynchronously |
+| FR-6.17 | Poll ingestion job status over HTTP | SHOULD | Endpoint returns status/stats/error for a given job ID, persisted so any worker process can serve the read |
+| FR-6.18 | Reset ingested data over HTTP | SHOULD | Destructive; requires an explicit confirmation flag; also clears the affected tables' persisted watermarks so a reset can't leave stale incremental state |
+| FR-6.19 | Source RDBMS connectivity check over HTTP | SHOULD | Distinct from process liveness (`/health`/`/ready`) — performs a real connectivity check against the configured source database and reports the result, bounded by a connection timeout |
 
 ---
 
@@ -175,6 +187,7 @@ Build an interactive GenAI chatbot that follows a full RAG lifecycle, starting w
 | NFR-2.2 | RBAC filter enforcement | 100% of retrieval results respect the caller's access scope |
 | NFR-2.3 | Multi-table ingestion throughput | > 10k rows/hour per table, parallelizable across tables |
 | NFR-2.4 | Conversational context latency overhead | < 1s p95 added for history retrieval + prompt assembly |
+| NFR-2.5 | Query rewrite latency overhead | < 2s p95 added when FR-6.14 is enabled (one extra LLM call per turn with history) |
 
 ---
 
@@ -214,6 +227,14 @@ Build an interactive GenAI chatbot that follows a full RAG lifecycle, starting w
 - `citations` (optional)
 - `created_at`
 
+### 5.6 Ingestion Job Record (Phase 2, FR-6.16–6.17)
+- `job_id`
+- `status` (pending/running/succeeded/failed)
+- `tables` (the resolved table scope for this run)
+- `stats` (per-table chunk counts, on success)
+- `error` (on failure)
+- `created_at` / `started_at` / `finished_at`
+
 ---
 
 ## 6. Risks & Mitigations
@@ -229,6 +250,8 @@ Build an interactive GenAI chatbot that follows a full RAG lifecycle, starting w
 | Long session context exceeds model context window | Medium | Medium | Sliding window + summarization strategy (FR-6.13) |
 | RDBMS dialect differences (pagination, type mapping, quoting) cause extraction bugs on non-PostgreSQL engines | Medium | Medium | Dialect-abstraction layer (e.g., SQLAlchemy) + adapter test matrix across supported engines (FR-1.1, FR-1.6) |
 | Coupling vector store to source RDBMS blocks portability or microservice reuse | Medium | Medium | Vector store connection configured and deployed independently of source DB (FR-1.7) |
+| Query rewriting (FR-6.14) adds latency/cost per conversational turn, or a rewrite failure blocks the request | Medium | Medium | Configurable on/off; fails open to the raw message on rewrite-call failure rather than erroring the whole request (NFR-2.5 budget) |
+| Small-talk detection (FR-6.15) misclassifies a real data question as small talk, silently skipping grounding | High | Low | Deterministic, narrowly-anchored pattern match requiring the *entire* message to be small talk (not a substring) — a data question mentioning a greeting word is not misclassified |
 
 ---
 
@@ -248,6 +271,9 @@ Build an interactive GenAI chatbot that follows a full RAG lifecycle, starting w
 - Hybrid retrieval (vector + keyword) and cross-encoder reranking (FR-6.6–6.8)
 - Role-based access filters in retrieval (FR-6.9–6.10)
 - Multi-turn conversational context with persisted session history (FR-6.11–6.13)
+- Context-aware query rewriting and conversational small-talk handling (FR-6.14–6.15)
+- Operational HTTP API for ingestion trigger/status, reset, and source-DB connectivity (FR-6.16–6.19)
+- Reference frontend implementation (FR-4.5)
 - Benchmarking and quality dashboards
 
 ---
@@ -267,4 +293,5 @@ Build an interactive GenAI chatbot that follows a full RAG lifecycle, starting w
 | 1.0 | 2026-03-05 | Engineering Team | Initial draft |
 | 1.1 | 2026-07-08 | Neamul Haque Khan | Added detailed Phase 2 functional requirements (§3.6), Phase 2 NFRs (§4.1), chat session/message data contracts (§5.4–5.5), Phase 2 risks (§6), and expanded Phase 2 milestones (§7); clarified FR-4.3 scope vs. FR-6.11 |
 | 1.2 | 2026-07-08 | Neamul Haque Khan | Reframed source extraction as RDBMS-agnostic (not PostgreSQL-only): updated §1.1/§1.2/§2.1, added FR-1.6–1.7, NFR-1.7–1.8, and two new risks; added non-goal excluding NoSQL sources; established microservice-pluggability as a Phase 1 requirement |
+| 1.3 | 2026-07-16 | Neamul Haque Khan | Documented capabilities built beyond the original spec, now formalized as requirements: FR-4.5 (reference frontend), FR-6.14–6.15 (query rewriting and small-talk handling, added to §3.6.5), new §3.6.6 Operational API (FR-6.16–6.19: ingestion trigger/status, reset, source-DB connectivity check), NFR-2.5 (query rewrite latency budget), and two new risks (query rewrite cost/failure, small-talk misclassification) |
 
