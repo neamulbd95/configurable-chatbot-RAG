@@ -1,6 +1,21 @@
 @use 'tokens' as *;
 
+// The host element (<mtf-card>) and this inner wrapper both need to
+// participate in flex layout, or a parent that does `display:flex` on the
+// host (e.g. to make a scrollable-messages + fixed-input chat panel) only
+// affects the host's own box — this inner div is still a plain block
+// container for its content, breaking the intended layout one level down.
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .mtf-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   background: $color-white;
   border: 1px solid $color-grey-200;
   border-radius: $radius-md;

@@ -1,7 +1,20 @@
 @use 'tokens' as *;
 
+// Same fix as chat-page.component.scss: the host is a direct flex child of
+// .shell__main (which has overflow:hidden), so without its own scroll
+// mechanism this page's content would silently clip once it grows past
+// the viewport instead of scrolling.
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .admin-page {
   max-width: 720px;
+  width: 100%;
   margin: 0 auto;
   padding: $space-lg;
   display: flex;

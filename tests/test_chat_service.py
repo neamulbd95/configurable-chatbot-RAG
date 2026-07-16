@@ -84,3 +84,32 @@ async def test_provider_failure_is_wrapped_with_identifying_prefix():
 
     with pytest.raises(ChatProviderError, match="Chat provider call failed"):
         await service.answer(ChatRequest(message="price?"), _grounded_context())
+
+
+@pytest.mark.asyncio
+async def test_small_talk_calls_provider_without_context_and_is_never_grounded():
+    provider = RecordingChatProvider(response="Hello! How can I help?")
+    service = ChatService(provider)
+
+    response = await service.answer_small_talk(ChatRequest(message="good morning"))
+
+    assert response.answer == "Hello! How can I help?"
+    assert response.grounded is False
+    assert response.confidence == 0.0
+    assert response.citations == []
+    # Uses the small-talk system prompt, not the grounded one — confirmed
+    # indirectly by checking the user content is the raw greeting, not a
+    # "Context:\n...\n\nQuestion:" wrapper like the grounded path builds.
+    assert provider.received_messages[-1]["content"] == "good morning"
+
+
+@pytest.mark.asyncio
+async def test_small_talk_threads_history_too():
+    provider = RecordingChatProvider()
+    service = ChatService(provider)
+    history = [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "hello!"}]
+
+    await service.answer_small_talk(ChatRequest(message="thanks"), history=history)
+
+    assert provider.received_messages[1] == history[0]
+    assert provider.received_messages[2] == history[1]
